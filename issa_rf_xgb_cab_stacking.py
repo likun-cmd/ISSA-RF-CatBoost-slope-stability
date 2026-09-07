@@ -20,14 +20,14 @@ from catboost import CatBoostRegressor
 
 
 # =========================================================
-# 0. 输出目录
+# 0. Output directory
 # =========================================================
 output_dir = "ISSA_stacking_nested_outputs"
 os.makedirs(output_dir, exist_ok=True)
 
 
 # =========================================================
-# 1. 数据读取
+# 1. Data loading
 # =========================================================
 def load_data(path):
     if path.endswith(".xlsx") or path.endswith(".xls"):
@@ -142,7 +142,7 @@ class ChaoticSSA:
 
 
 # =========================================================
-# 3. 参数解码
+# 3. Parameter decoding
 # =========================================================
 def decode_rf_params(params):
     max_features_raw = params[4]
@@ -198,7 +198,7 @@ def decode_catb_params(params):
 
 
 # =========================================================
-# 4. 单模型 ISSA 目标函数
+# 4. Objective function for single-model ISSA
 # =========================================================
 def make_single_objective(model_type, X_train_outer, y_train_outer, inner_cv):
     def objective(params):
@@ -228,7 +228,7 @@ def make_single_objective(model_type, X_train_outer, y_train_outer, inner_cv):
 
 
 # =========================================================
-# 5. 优化单个基学习器
+# 5. Optimize a single base learner
 # =========================================================
 def optimize_base_model(model_type, X_train_outer, y_train_outer, inner_cv, verbose=False):
     if model_type == "RF":
@@ -282,7 +282,7 @@ def optimize_base_model(model_type, X_train_outer, y_train_outer, inner_cv, verb
 
 
 # =========================================================
-# 6. stacking 模型运行
+# 6. Run stacking model with nested outer splits
 # =========================================================
 def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names, random_seeds):
     results = []
@@ -294,7 +294,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
         print(f"{model_name} | Outer Split {split_id}/{len(random_seeds)} | random_state={seed}")
         print("=" * 90)
 
-        # 外层划分
+        # Outer train-test split
         X_train_outer, X_test_outer, y_train_outer, y_test_outer = train_test_split(
             X, y,
             test_size=0.25,
@@ -311,7 +311,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
 
         split_inner_rmse = {}
 
-        # 逐个优化基学习器
+        # Optimize each base learner sequentially
         for base_type in base_model_types:
             print(f"\nOptimizing base learner: {base_type}")
             base_model, base_params, base_best_rmse, base_convergence = optimize_base_model(
@@ -328,7 +328,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
             for k, v in base_params.items():
                 split_param_record[f"{base_type}_{k}"] = v
 
-            # 保存每个基学习器在每个split的收敛曲线
+            # Save convergence curve for each base learner in each split
             plt.figure(figsize=(8, 5))
             plt.plot(base_convergence, linewidth=2)
             plt.xlabel("Iteration")
@@ -345,7 +345,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
             print(f"{base_type} best inner CV RMSE: {base_best_rmse:.6f}")
             print(f"{base_type} best params: {base_params}")
 
-        # Stacking 元学习器
+        # Stacking meta-learner
         stacking_model = StackingRegressor(
             estimators=estimators,
             final_estimator=LinearRegression(),
@@ -354,10 +354,10 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
             passthrough=False
         )
 
-        # 训练 stacking
+        # Train stacking model
         stacking_model.fit(X_train_outer, y_train_outer)
 
-        # 测试集评估
+        # Evaluate on test set
         y_pred = stacking_model.predict(X_test_outer)
 
         mae = mean_absolute_error(y_test_outer, y_pred)
@@ -387,7 +387,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
             f"R2: {r2:.4f}"
         )
 
-        # 近似特征重要性：对可提取 importance 的基模型做平均
+        # Approximate feature importance: average over base models that support importance extraction
         temp_importances = []
         for _, est in stacking_model.named_estimators_.items():
             if hasattr(est, "feature_importances_"):
@@ -403,7 +403,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
         else:
             feature_importance_list.append(np.zeros(len(feature_names)))
 
-    # 保存 split 结果
+    # Save split results
     results_df = pd.DataFrame(results)
     results_df.to_csv(
         os.path.join(output_dir, f"{model_name}_split_results.csv"),
@@ -418,7 +418,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
         encoding="utf-8-sig"
     )
 
-    # summary
+    # Summary statistics
     summary_row = {
         "model": model_name,
         "MAE_mean": results_df["MAE"].mean(),
@@ -444,7 +444,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
     print(f"RMSE = {summary_row['RMSE_mean']:.4f} ± {summary_row['RMSE_std']:.4f}")
     print(f"R2   = {summary_row['R2_mean']:.4f} ± {summary_row['R2_std']:.4f}")
 
-    # 平均特征重要性
+    # Average feature importance
     fi_array = np.array(feature_importance_list)
     fi_mean = fi_array.mean(axis=0)
     fi_std = fi_array.std(axis=0)
@@ -485,7 +485,7 @@ def run_nested_stacking_model(model_name, base_model_types, X, y, feature_names,
 
 
 # =========================================================
-# 7. 主程序
+# 7. Main program
 # =========================================================
 if __name__ == "__main__":
     start_time = time.time()
@@ -544,7 +544,7 @@ if __name__ == "__main__":
     )
     all_summary.append(summary_4)
 
-    # 保存总汇总
+    # Save overall summary
     all_summary_df = pd.DataFrame(all_summary)
     all_summary_df.to_csv(
         os.path.join(output_dir, "ISSA_stacking_all_models_summary_mean_std.csv"),
