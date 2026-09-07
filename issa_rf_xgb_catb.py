@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib
 
-# 非交互后端，避免 backend_interagg 报错
+# Non-interactive backend to avoid backend_interagg errors
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -20,14 +20,14 @@ from catboost import CatBoostRegressor
 
 
 # =========================================================
-# 0. 输出目录
+# 0. Output directory
 # =========================================================
 output_dir = "ISSA_nested_outputs"
 os.makedirs(output_dir, exist_ok=True)
 
 
 # =========================================================
-# 1. 数据读取
+# 1. Data loading
 # =========================================================
 def load_data(path):
     if path.endswith(".xlsx") or path.endswith(".xls"):
@@ -41,7 +41,7 @@ def load_data(path):
 
 
 # =========================================================
-# 2. Tent 混沌映射改进的 SSA
+# 2. SSA improved with Tent chaotic mapping
 # =========================================================
 class ChaoticSSA:
     def __init__(self, objective_func, dim, lb, ub, pop_size=20, max_iter=20):
@@ -81,7 +81,7 @@ class ChaoticSSA:
         PD = max(1, int(0.2 * self.pop_size))
         SD = max(1, int(0.1 * self.pop_size))
 
-        # 发现者
+        # Discoverers
         for i in range(PD):
             chaos = self.chaotic_sequence(self.dim, seed=np.random.rand())
             for j in range(self.dim):
@@ -100,7 +100,7 @@ class ChaoticSSA:
                     self.best_fitness = new_fit
                     self.best_solution = self.population[i].copy()
 
-        # 跟随者
+        # Followers
         for i in range(PD, self.pop_size):
             A = np.random.randint(0, 2, size=self.dim) * 2 - 1
 
@@ -118,7 +118,7 @@ class ChaoticSSA:
                     self.best_fitness = new_fit
                     self.best_solution = self.population[i].copy()
 
-        # 警戒者
+        # Scouts
         for _ in range(SD):
             idx = np.random.randint(self.pop_size)
             chaos = self.chaotic_sequence(self.dim, seed=np.random.rand())
@@ -149,7 +149,7 @@ class ChaoticSSA:
 
 
 # =========================================================
-# 3. 参数解码函数
+# 3. Parameter decoding functions
 # =========================================================
 def decode_rf_params(params):
     max_features_raw = params[4]
@@ -205,7 +205,7 @@ def decode_catb_params(params):
 
 
 # =========================================================
-# 4. 构造 ISSA 目标函数：仅在外层训练集上做 5-fold CV
+# 4. Construct ISSA objective function: 5-fold CV on outer training set only
 # =========================================================
 def make_objective(model_name, X_train_outer, y_train_outer, inner_cv):
     def objective(params):
@@ -237,7 +237,7 @@ def make_objective(model_name, X_train_outer, y_train_outer, inner_cv):
 
 
 # =========================================================
-# 5. 运行单个模型的 nested repeated random splits
+# 5. Run nested repeated random splits for a single model
 # =========================================================
 def run_nested_issa_model(
     model_name,
@@ -260,14 +260,14 @@ def run_nested_issa_model(
         print(f"{model_name} | Outer Split {split_id}/{len(random_seeds)} | random_state={seed}")
         print("-" * 80)
 
-        # 外层：隔离测试集
+        # Outer split: isolate test set
         X_train_outer, X_test_outer, y_train_outer, y_test_outer = train_test_split(
             X, y,
             test_size=0.25,
             random_state=seed
         )
 
-        # 内层CV：只在外层训练集上优化参数
+        # Inner CV: optimize parameters only on the outer training set
         inner_cv = KFold(n_splits=5, shuffle=True, random_state=seed)
 
         objective_func = make_objective(model_name, X_train_outer, y_train_outer, inner_cv)
@@ -283,7 +283,7 @@ def run_nested_issa_model(
 
         best_solution, convergence = optimizer.optimize(verbose=True)
 
-        # 解码最优参数
+        # Decode optimal parameters
         if model_name == "ISSA_RF":
             best_params = decode_rf_params(best_solution)
             best_model = RandomForestRegressor(**best_params)
@@ -302,10 +302,10 @@ def run_nested_issa_model(
         print("Best params:", best_params)
         print(f"Best inner CV RMSE: {optimizer.best_fitness:.6f}")
 
-        # 用最优参数在整个外层训练集重新训练
+        # Retrain on the entire outer training set with optimal parameters
         best_model.fit(X_train_outer, y_train_outer)
 
-        # 在外层测试集评估
+        # Evaluate on the outer test set
         y_pred = best_model.predict(X_test_outer)
 
         mae = mean_absolute_error(y_test_outer, y_pred)
@@ -347,7 +347,7 @@ def run_nested_issa_model(
             f"R2: {r2:.4f}"
         )
 
-        # 每个 split 的收敛曲线
+        # Convergence curve for each split
         plt.figure(figsize=(8, 5))
         plt.plot(convergence, color="red", linewidth=2)
         plt.xlabel("Iteration")
@@ -362,7 +362,7 @@ def run_nested_issa_model(
         plt.close()
 
     # -----------------------------------------------------
-    # 保存每次 split 结果
+    # Save results for each split
     # -----------------------------------------------------
     results_df = pd.DataFrame(results)
     results_df.to_csv(
@@ -379,7 +379,7 @@ def run_nested_issa_model(
     )
 
     # -----------------------------------------------------
-    # 计算 mean ± SD
+    # Compute mean ± SD
     # -----------------------------------------------------
     summary_row = {
         "model": model_name,
@@ -407,7 +407,7 @@ def run_nested_issa_model(
     print(f"R2   = {summary_row['R2_mean']:.4f} ± {summary_row['R2_std']:.4f}")
 
     # -----------------------------------------------------
-    # 平均特征重要性
+    # Average feature importance
     # -----------------------------------------------------
     fi_array = np.array(feature_importance_list)
     fi_mean = fi_array.mean(axis=0)
@@ -449,20 +449,20 @@ def run_nested_issa_model(
 
 
 # =========================================================
-# 6. 主程序
+# 6. Main program
 # =========================================================
 if __name__ == "__main__":
     start_time = time.time()
     print("start_time:", start_time)
 
-    # 数据
+    # Data
     data_path = "data_set.xlsx"
     X, y = load_data(data_path)
     feature_names = list(X.columns)
 
     print(f"Data loaded: X={X.shape}, y={y.shape}")
 
-    # 外层随机种子
+    # Outer random seeds
     random_seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     all_model_summary = []
@@ -519,7 +519,7 @@ if __name__ == "__main__":
     all_model_summary.append(catb_summary)
 
     # =====================================================
-    # 全部模型汇总
+    # Summary of all models
     # =====================================================
     all_summary_df = pd.DataFrame(all_model_summary)
     all_summary_df.to_csv(
