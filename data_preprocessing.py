@@ -1,24 +1,22 @@
-
 from sklearn import preprocessing
 import pandas as pd
 import numpy as np
 # -*- coding: utf-8 -*-
 
-data = pd.read_excel("raw_data.xlsx")#输入训练集
-x=data.iloc[:,0:6]
+data = pd.read_excel("raw_data.xlsx")  # Load training set
+x = data.iloc[:, 0:6]
 print(x)
 min_max_scaler = preprocessing.MinMaxScaler()
 x_minmax = min_max_scaler.fit_transform(x)
-print(np.around(x_minmax,decimals=3))
+print(np.around(x_minmax, decimals=3))
 
+testData = np.around(x_minmax, decimals=3)
 
-testData=np.around(x_minmax,decimals=3)
-
-def pd_toExcel(data, fileName):  # pandas库储存数据到excel
+def pd_toExcel(data, fileName):  # Save data to Excel using pandas
     a = []
     b = []
     c = []
-    d= []
+    d = []
     e = []
     f = []
     # g = []
@@ -31,7 +29,7 @@ def pd_toExcel(data, fileName):  # pandas库储存数据到excel
         f.append(data[i][5])
         # g.append(data[i][6])
 
-    dfData = {  # 用字典设置DataFrame所需数据
+    dfData = {  # Use dictionary to set the data for DataFrame
         'a': a,
         'b': b,
         'c': c,
@@ -40,10 +38,8 @@ def pd_toExcel(data, fileName):  # pandas库储存数据到excel
         'f': f,
         # 'g': g
     }
-    df = pd.DataFrame(dfData)  # 创建DataFrame
-    df.to_excel(fileName, index=False)  # 存表，去除原始索引列（0,1,2...）
-
-
+    df = pd.DataFrame(dfData)  # Create DataFrame
+    df.to_excel(fileName, index=False)  # Save table, remove the original index column (0,1,2,...)
 
 fileName = 'data_set.xlsx'
 pd_toExcel(testData, fileName)
