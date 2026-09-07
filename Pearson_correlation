@@ -1,0 +1,240 @@
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.cm import ScalarMappable
+import numpy as np
+import pandas as pd
+import warnings
+import matplotlib
+
+matplotlib.use('TkAgg')
+warnings.filterwarnings("ignore")
+
+# Set plotting parameters with enlarged fonts
+plt.rcParams.update({
+    'font.family': 'Arial',  # Keep font type unchanged
+    'font.size': 10,  
+    'axes.titlesize': 10,  # Title font size increased accordingly
+    'axes.labelsize': 9,  # Axis labels enlarged appropriately
+    'xtick.labelsize': 8,  
+    'ytick.labelsize': 8, 
+    'legend.fontsize': 8,
+    'axes.linewidth': 0.8,  # Slightly thicken axes for visual balance
+    'lines.linewidth': 1.2,  # Adjust line width accordingly
+})
+
+variables = ['γ', 'C', 'φ', 'α', 'H', 'ru']  
+# Data loading and preprocessing
+df = pd.read_excel('new_data.xlsx')
+
+
+if len(df.columns) == 1:
+    # Special handling for single-column data
+    data_array = df.to_numpy().reshape(-1, 1)
+else:
+    data_array = df.to_numpy()
+
+numeric_cols = df.select_dtypes(include=[np.number]).columns
+df = df[numeric_cols]
+n_features = data_array.shape[1]
+
+# +++ New: Compute correlation coefficient matrix +++
+corr_matrix = df.corr().values  # Ensure correct computation here
+
+# Verify data dimensions
+print("Data dimensions:", data_array.shape)
+print("Data type:", data_array.dtype)
+
+# Create subplot matrix with adjusted size ratio - increase bottom space for figure title
+fig, axes = plt.subplots(
+    n_features, n_features,
+    figsize=(2.5 * n_features, 2.5 * n_features + 0.5),  # Increase height for figure title
+    gridspec_kw={'wspace': 0.1, 'hspace': 0.1}  # Increase subplot spacing
+)
+
+# Color definitions
+CMAP = 'YlGnBu'  
+HIST_COLOR = '#4C72B0'  # Adjust histogram color to dark blue
+SCATTER_COLOR = '#4C72B0'
+
+# Define y-axis ranges for histograms
+hist_y_ranges = [
+    (0, 120),  # First histogram y-axis range
+    (0, 320),  # Second histogram y-axis range
+    (0, 200),  # Third histogram y-axis range
+    (0, 160),  # Fourth histogram y-axis range
+    (0, 120),  # Fifth histogram y-axis range
+    (0, 240)   # Sixth histogram y-axis range
+]
+
+# Iterate over all subplots
+for i in range(n_features):
+    for j in range(n_features):
+        ax = axes[i, j]
+
+       
+        ax.tick_params(
+            which='both',  # Set both major and minor ticks
+            direction='in',  # Tick marks point inward
+            pad=2,  # Distance between tick labels and axes
+            length=3,  # Tick mark length
+            width=0.6,  # Tick mark width - appropriate thickness
+            colors='black',  # Tick mark color
+            bottom=True, top=False, left=True, right=False  # Only show bottom and left ticks
+        )
+
+        # Major tick marks slightly thicker
+        ax.tick_params(which='major', width=0.8, length=4)
+        # Minor tick marks thinner
+        ax.tick_params(which='minor', width=0.4, length=2)
+
+        # --- Diagonal: Optimized histograms ---
+        if i == j:
+            sns.histplot(
+                x=data_array[:, i],
+                kde=True,
+                ax=ax,
+                color=HIST_COLOR,
+                edgecolor='w',
+                linewidth=0.3,  # Histogram border line width
+                bins=12,
+                alpha=0.9,
+                kde_kws={'bw_method': 'scott'},  # Optional parameter
+                line_kws={
+                    'linewidth': 0.8,  # KDE curve line width
+                    'color': '#2E4053',  # KDE curve color
+                    'linestyle': '-'  # Line style
+                }
+            )
+
+            # +++ Add y-axis title 'Density' for the first histogram +++
+            if i == 0:  # First histogram
+                ax.set_ylabel('Density', fontsize=10, labelpad=10)
+            else:
+                ax.set_ylabel('', fontsize=9, labelpad=5)
+
+            # +++  Place variable name below the plot +++
+            # Remove top title
+            ax.set_title('', fontsize=10, pad=3)
+
+            # +++ Remove top and right axes +++
+            ax.spines[['right', 'top']].set_visible(False)
+
+            # +++ Set histogram y-axis range +++
+            if i < len(hist_y_ranges):
+                ax.set_ylim(hist_y_ranges[i])
+
+            # +++ Set histogram x-axis range to 0-1 +++
+            ax.set_xlim(0, 1)
+
+            ax.yaxis.set_major_locator(plt.MaxNLocator(4))
+
+            # +++ Add variable label below x-axis +++
+            if i < len(variables):
+                ax.set_xlabel(variables[i], fontsize=10, labelpad=8)
+            else:
+                ax.set_xlabel(df.columns[i].replace('_', ' '), fontsize=10, labelpad=8)
+
+        # --- Lower triangle: Optimized scatter plots ---
+        elif i > j:
+            sns.scatterplot(
+                x=data_array[:, j],
+                y=data_array[:, i],
+                ax=ax,
+                color=SCATTER_COLOR,
+                alpha=0.7,
+                s=12,  # Adjust point size
+                edgecolor='none',
+                linewidth=0,
+                rasterized=True  # Optimize rendering for large datasets
+            )
+            # +++ Remove top and right axes +++
+            ax.spines[['right', 'top']].set_visible(False)
+
+            # +++ Set scatter plot x-axis and y-axis ranges to 0-1 +++
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+
+            # +++ Modify scatter plot tick labels to integers 0 and 1 +++
+            ax.set_xticks([0, 0.25, 0.5, 0.75, 1])
+            ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
+            ax.set_xticklabels(['0', '0.25', '0.5', '0.75', '1'])
+            ax.set_yticklabels(['0', '0.25', '0.5', '0.75', '1'])
+
+            ax.xaxis.set_major_locator(plt.MaxNLocator(4))
+            ax.yaxis.set_major_locator(plt.MaxNLocator(4))
+
+            # +++ Add variable labels to scatter plot axes +++
+            if i == n_features - 1:  # Last row
+                if j < len(variables):
+                    ax.set_xlabel(variables[j], fontsize=10, labelpad=8)
+                else:
+                    ax.set_xlabel(df.columns[j].replace('_', ' '), fontsize=10, labelpad=8)
+
+            if j == 0:  # First column
+                if i < len(variables):
+                    ax.set_ylabel(variables[i], fontsize=10, labelpad=8)
+                else:
+                    ax.set_ylabel(df.columns[i].replace('_', ' '), fontsize=10, labelpad=8)
+
+        # --- Upper triangle: Optimized heatmaps ---
+        else:
+            sns.heatmap(
+                np.array([[corr_matrix[i, j]]]),
+                cmap=CMAP,
+                vmin=-1,
+                vmax=1,
+                square=True,
+                cbar=False,
+                annot=True,
+                fmt=".2f",
+                annot_kws={"size": 14, "color": "black"},
+                xticklabels=False,
+                yticklabels=False,
+                ax=ax
+            )
+            ax.set_facecolor('#F8F8F8')  # Add light background
+
+            # +++ Remove top and right axes from heatmap +++
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+
+# --- Optimize global colorbar ---
+fig.subplots_adjust(right=0.85, bottom=0.1)  # Adjust bottom margin
+cbar_ax = fig.add_axes([0.87, 0.15, 0.015, 0.7])  # Precisely adjust position
+
+# Create colorbar mapping object
+norm = plt.Normalize(vmin=-1, vmax=1)
+sm = ScalarMappable(norm=norm, cmap=CMAP)
+sm.set_array([])  # Must set an empty array
+
+# Add global colorbar
+cbar = fig.colorbar(
+    sm,
+    cax=cbar_ax,
+    orientation='vertical',
+    ticks=[-1, -0.5, 0, 0.5, 1]
+)
+
+# Set colorbar tick style for consistency
+cbar.ax.tick_params(
+    direction='in',
+    length=3,
+    width=0.6,
+    colors='black'
+)
+
+# Optionally save as vector graphics
+plt.savefig("Nature_Style_Corrmatrix.pdf", dpi=600,
+            format='pdf',
+            bbox_inches='tight',
+            facecolor='white',  # Ensure white background
+            edgecolor='none')
+
+plt.savefig("Nature_Style_Corrmatrix.png", dpi=600,
+            format='png',
+            bbox_inches='tight',
+            facecolor='white',  # Ensure white background
+            edgecolor='none')
+
+plt.show()
+plt.close()
