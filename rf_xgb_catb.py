@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import matplotlib
 
-# 使用非交互后端，避免 PyCharm/backend_interagg 报错
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -17,21 +16,21 @@ from catboost import CatBoostRegressor
 
 
 # =========================================================
-# 0. 创建输出文件夹
+# 0. Create output directory
 # =========================================================
 output_dir = "model_outputs"
 os.makedirs(output_dir, exist_ok=True)
 
 
 # =========================================================
-# 1. 开始计时
+# 1. Start timing
 # =========================================================
 start = time.time()
 print("start_time:", start)
 
 
 # =========================================================
-# 2. 读取数据
+# 2. Load data
 # =========================================================
 data = pd.read_excel("data_set.xlsx")
 X = data.iloc[:, :-1]
@@ -42,13 +41,13 @@ print(f"Dataset shape: X={X.shape}, y={y.shape}")
 
 
 # =========================================================
-# 3. 外层随机划分设置
+# 3. Outer random split settings
 # =========================================================
 random_seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 
 # =========================================================
-# 4. 定义模型及参数空间
+# 4. Define models and parameter spaces
 # =========================================================
 model_specs = {
     "RF": {
@@ -101,13 +100,13 @@ model_specs = {
 
 
 # =========================================================
-# 5. 总汇总表
+# 5. Overall summary table
 # =========================================================
 all_model_summary = []
 
 
 # =========================================================
-# 6. 主循环：依次运行 RF / XGB / CatB
+# 6. Main loop: run RF / XGB / CatB sequentially
 # =========================================================
 for model_name, spec in model_specs.items():
 
@@ -123,19 +122,19 @@ for model_name, spec in model_specs.items():
     feature_importance_list = []
 
     # -----------------------------------------------------
-    # 外层 10 次随机划分
+    # Outer 10 random splits
     # -----------------------------------------------------
     for split_id, seed in enumerate(random_seeds, start=1):
         print(f"\n[{model_name}] Outer Split {split_id}/{len(random_seeds)} | random_state={seed}")
 
-        # 外层划分：先隔离测试集
+        # Outer split: isolate test set first
         X_train_outer, X_test_outer, y_train_outer, y_test_outer = train_test_split(
             X, y,
             test_size=0.25,
             random_state=seed
         )
 
-        # 内层CV：仅在训练集上调参
+        # Inner CV: tune parameters only on the training set
         inner_cv = KFold(
             n_splits=5,
             shuffle=True,
@@ -151,7 +150,7 @@ for model_name, spec in model_specs.items():
             refit=True
         )
 
-        # 只在外层训练集上搜索最优参数
+        # Search for optimal parameters only on the outer training set
         grid_search.fit(X_train_outer, y_train_outer)
 
         best_model = grid_search.best_estimator_
@@ -159,10 +158,10 @@ for model_name, spec in model_specs.items():
 
         print("Best params:", best_params)
 
-        # 外层测试集预测
+        # Prediction on outer test set
         y_pred = best_model.predict(X_test_outer)
 
-        # 指标
+        # Metrics
         mae = mean_absolute_error(y_test_outer, y_pred)
         mse = mean_squared_error(y_test_outer, y_pred)
         rmse = np.sqrt(mse)
@@ -184,11 +183,11 @@ for model_name, spec in model_specs.items():
             **best_params
         })
 
-        # 特征重要性
+        # Feature importance
         if hasattr(best_model, "feature_importances_"):
             feature_importance_list.append(best_model.feature_importances_)
         else:
-            # 理论上这三个模型都有 feature_importances_
+            # All three models theoretically have feature_importances_
             feature_importance_list.append(np.zeros(X.shape[1]))
 
         print(
@@ -200,19 +199,19 @@ for model_name, spec in model_specs.items():
         )
 
     # =====================================================
-    # 7. 保存每个模型每次 split 结果
+    # 7. Save results for each split for each model
     # =====================================================
     results_df = pd.DataFrame(results)
     results_path = os.path.join(output_dir, f"{model_name}_split_results.csv")
     results_df.to_csv(results_path, index=False, encoding="utf-8-sig")
 
-    # 最优参数
+    # Optimal parameters
     best_params_df = pd.DataFrame(best_params_list)
     best_params_path = os.path.join(output_dir, f"{model_name}_best_params_each_split.csv")
     best_params_df.to_csv(best_params_path, index=False, encoding="utf-8-sig")
 
     # =====================================================
-    # 8. 计算 mean ± SD
+    # 8. Compute mean ± SD
     # =====================================================
     summary_row = {
         "model": model_name,
@@ -243,7 +242,7 @@ for model_name, spec in model_specs.items():
     print(f"R2   = {summary_row['R2_mean']:.4f} ± {summary_row['R2_std']:.4f}")
 
     # =====================================================
-    # 9. 平均特征重要性
+    # 9. Average feature importance
     # =====================================================
     feature_importance_array = np.array(feature_importance_list)
     mean_feature_importance = feature_importance_array.mean(axis=0)
@@ -258,7 +257,7 @@ for model_name, spec in model_specs.items():
     fi_csv_path = os.path.join(output_dir, f"{model_name}_feature_importance_mean_std.csv")
     feature_importance_df.to_csv(fi_csv_path, index=False, encoding="utf-8-sig")
 
-    # 画图并保存
+    # Plot and save
     plt.figure(figsize=(10, 6))
     plt.barh(
         feature_importance_df["Feature"],
@@ -279,7 +278,7 @@ for model_name, spec in model_specs.items():
 
 
 # =========================================================
-# 10. 保存所有模型总汇总表
+# 10. Save overall summary table for all models
 # =========================================================
 all_model_summary_df = pd.DataFrame(all_model_summary)
 all_summary_path = os.path.join(output_dir, "all_models_summary_mean_std.csv")
@@ -292,7 +291,7 @@ print(all_model_summary_df)
 
 
 # =========================================================
-# 11. 结束计时
+# 11. End timing
 # =========================================================
 end = time.time()
 print("\nend_time:", end)
